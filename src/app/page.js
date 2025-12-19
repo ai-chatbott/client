@@ -1,66 +1,58 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useState } from "react";
 
 export default function Home() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text) return;
+
+    // show user UI
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setInput("");
+
+    // request backend
+    const res = await fetch("http://127.0.0.1:8000/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    const data = await res.json();
+
+    // respond bot UI
+    setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main style={{ maxWidth: 600, margin: "40px auto", fontFamily: "system-ui" }}>
+      <h1>AI Chatbot Demo</h1>
+
+      <div style={{ border: "1px solid #ddd", padding: 12, minHeight: 300, marginTop: 16 }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ marginBottom: 12 }}>
+            <b>{m.role === "user" ? "You" : "Bot"}:</b> {m.text}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type a message..."
+          style={{ flex: 1, padding: 10 }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") send();
+          }}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <button onClick={send} style={{ padding: "10px 14px" }}>
+          Send
+        </button>
+      </div>
+    </main>
   );
 }
