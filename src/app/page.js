@@ -5,6 +5,8 @@ import { useState } from "react";
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const SESSION_ID = "demo-session";
+
 
   async function send() {
     const text = input.trim();
@@ -18,7 +20,7 @@ export default function Home() {
     const res = await fetch("http://127.0.0.1:8000/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ session_id:SESSION_ID, text }),
     });
 
     const data = await res.json();
