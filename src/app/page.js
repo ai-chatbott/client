@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
+  const SESSION_ID = "demo-session";
+
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
-  const SESSION_ID = "demo-session";
 
 
   async function send() {
@@ -16,20 +17,34 @@ export default function Home() {
     setMessages((prev) => [...prev, { role: "user", text }]);
     setInput("");
 
-    // request backend
+    try {
     const res = await fetch("http://127.0.0.1:8000/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id:SESSION_ID, text }),
+      body: JSON.stringify({ session_id: SESSION_ID, text }),
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+      const errText = await res.text();
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: `Server error (${res.status}): ${errText}` },
+      ]);
+      return;
+    }
 
-    // respond bot UI
+    const data = await res.json();
     setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
+  } catch (e) {
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: "Network error. Is the backend running?" },
+    ]);
+  }
   }
 
   return (
+    <div id="ai-chat-widget">
     <main style={{ maxWidth: 600, margin: "40px auto", fontFamily: "system-ui" }}>
       <h1>AI Chatbot Demo</h1>
 
@@ -56,5 +71,6 @@ export default function Home() {
         </button>
       </div>
     </main>
+    </div>
   );
 }
