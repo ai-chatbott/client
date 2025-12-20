@@ -1,17 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { preconnect } from "react-dom";
 
   const SESSION_ID = "demo-session";
 
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const [name, setName] = useState("")
 
 
   async function send() {
     const text = input.trim();
     if (!text) return;
+
+    //if name is not set yet, treat first message as name
+    if (!name){
+      setName(text);
+      setMessages((prev)=> [
+        ...prev,
+        {role: "bot", text: `Nice to meet you, ${text}! How can I help you today?`}
+      ])
+      setInput("")
+      return;
+    }
 
     // show user UI
     setMessages((prev) => [...prev, { role: "user", text }]);
@@ -21,7 +34,7 @@ export default function Home() {
     const res = await fetch("http://127.0.0.1:8000/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: SESSION_ID, text }),
+      body: JSON.stringify({ session_id: SESSION_ID, text, name }),
     });
 
     if (!res.ok) {
