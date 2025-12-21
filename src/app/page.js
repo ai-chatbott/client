@@ -2,60 +2,99 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const SESSION_KEY = "bss_session_id";
-const NAME_KEY = "bss_name";
-const BOT_NAME = "Shohre";
+function getBizId() {
+  if (typeof window === "undefined") return "default";
+  const p = new URLSearchParams(window.location.search);
+  return p.get("biz") || "default";
+}
 
-function getSessionId() {
+function getOrCreateId(storageKey) {
   if (typeof window === "undefined") return "server";
-  let id = localStorage.getItem(SESSION_KEY);
+  let id = localStorage.getItem(storageKey);
   if (!id) {
     id = crypto.randomUUID();
-    localStorage.setItem(SESSION_KEY, id);
+    localStorage.setItem(storageKey, id);
   }
   return id;
 }
 
 export default function Home() {
-  const sessionId = useMemo(() => getSessionId(), []);
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://server-vwfd.onrender.com";
+
+  const bizId = useMemo(() => getBizId(), []);
+
+  // ✅ per-biz storage keys so sessions don't mix between clients
+  const SESSION_KEY = useMemo(() => `bss_session_id_${bizId}`, [bizId]);
+  const NAME_KEY = useMemo(() => `bss_name_${bizId}`, [bizId]);
+
+  const sessionId = useMemo(() => getOrCreateId(SESSION_KEY), [SESSION_KEY]);
+
+  // ✅ you were calling setBiz without state; now it's real
+  const [biz, setBiz] = useState(null);
+
   const [input, setInput] = useState("");
   const [name, setName] = useState("");
   const [messages, setMessages] = useState([
-    { role: "bot", text: "Hello! Welcome to Beauty Shohre Studio. What’s your name?" },
+    { role: "assistant", text: "Hello! What’s your name?" },
   ]);
 
-  // Load saved name + chat history on refresh
+  // Load business config (name/assistant/links/phone)
+  useEffect(() => {
+    fetch(`${API_BASE}/business/${bizId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setBiz(data))
+      .catch(() => setBiz(null));
+  }, [API_BASE, bizId]);
+
+  const BOT_NAME = biz?.assistantName || "Assistant";
+
+  // Load saved name + chat history
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const savedName = localStorage.getItem(NAME_KEY);
     if (savedName) setName(savedName);
 
-    fetch(`http://localhost:8000/history?session_id=${sessionId}`)
+    // ✅ history now includes biz_id (so backend can separate)
+    fetch(`${API_BASE}/history?session_id=${encodeURIComponent(sessionId)}&biz_id=${encodeURIComponent(bizId)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.messages?.length) setMessages(data.messages);
       })
       .catch(() => {});
-  }, [sessionId]);
+  }, [API_BASE, sessionId, bizId, NAME_KEY]);
 
   function renderText(text) {
+    // ✅ keep your "keyword link" logic, but make URLs dynamic from biz config
+    const bookingUrl = biz?.links?.booking || "#";
+    const galleryUrl = biz?.links?.gallery || "#";
+    const instagramUrl = biz?.links?.instagram || "#";
+    const phone = biz?.phone || "";
+
     return text
       .replace(
         /book online/gi,
-        `<a href="https://beautyshohrestudio.ca/booking" target="_blank" style="color:#4da3ff;text-decoration:underline;">book online</a>`
+        bookingUrl === "#"
+          ? "book online"
+          : `<a href="${bookingUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">book online</a>`
       )
       .replace(
         /call or text Shohre at (\d{3}[- ]?\d{3}[- ]?\d{4})/gi,
-        `<a href="tel:$1" style="color:#4da3ff;text-decoration:underline;">call or text Shohre at $1</a>`
+        phone
+          ? `<a href="tel:${phone}" style="color:#4da3ff;text-decoration:underline;">call or text us at ${phone}</a>`
+          : `call or text us`
       )
       .replace(
         /website gallery/gi,
-        `<a href="https://beautyshohrestudio.ca/#gallery" target="_blank" style="color:#4da3ff;text-decoration:underline;">website gallery</a>`
+        galleryUrl === "#"
+          ? "website gallery"
+          : `<a href="${galleryUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">website gallery</a>`
       )
       .replace(
         /Instagram/gi,
-        `<a href="https://www.instagram.com/beautyshohre_studio" target="_blank" style="color:#4da3ff;text-decoration:underline;">Instagram</a>`
+        instagramUrl === "#"
+          ? "Instagram"
+          : `<a href="${instagramUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">Instagram</a>`
       );
   }
 
@@ -63,7 +102,7 @@ export default function Home() {
     const text = input.trim();
     if (!text) return;
 
-    // Step 1: capture name once
+    // Step 1: capture name once (keep your logic)
     if (!name) {
       setName(text);
       localStorage.setItem(NAME_KEY, text);
@@ -71,7 +110,7 @@ export default function Home() {
       setMessages((prev) => [
         ...prev,
         { role: "user", text },
-        { role: "bot", text: `I'm Beauty Shohre Assistant. How can I help you today, ${text}?` },
+        { role: "assistant", text: `I'm ${BOT_NAME}. How can I help you today, ${text}?` },
       ]);
       setInput("");
       return;
@@ -82,37 +121,47 @@ export default function Home() {
     setInput("");
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      const res = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, text, name }),
+
+        // ✅ you MUST send biz_id because backend expects it
+        body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text, name }),
       });
 
       if (!res.ok) {
         const errText = await res.text();
         setMessages((prev) => [
           ...prev,
-          { role: "bot", text: `Server error (${res.status}): ${errText}` },
+          { role: "assistant", text: `Server error (${res.status}): ${errText}` },
         ]);
         return;
       }
 
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
+      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "bot", text: "Network error. Is the backend running?" },
+        { role: "assistant", text: "Network error. Please try again." },
       ]);
     }
   }
 
   return (
     <div id="ai-chat-widget">
-      <main style={{ maxWidth: 600, margin: "40px auto", fontFamily: "system-ui" }}>
-        <h1>AI Chatbot Demo</h1>
+      <main style={{ maxWidth: 600, margin: "20px auto", fontFamily: "system-ui" }}>
+        {/* ✅ remove “Demo” */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontWeight: 700 }}>
+            {biz?.businessName ? `${biz.businessName} Assistant` : "Assistant"}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>
+            Ask about services, booking, pricing basics, and policies.
+          </div>
+        </div>
 
-        <div style={{ border: "1px solid #ddd", padding: 12, minHeight: 300, marginTop: 16 }}>
+        <div style={{ border: "1px solid #ddd", padding: 12, minHeight: 320, borderRadius: 12 }}>
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <b>{m.role === "user" ? "You" : BOT_NAME}:</b>{" "}
@@ -126,10 +175,10 @@ export default function Home() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={name ? "Type your question…" : "Please enter your name"}
-            style={{ flex: 1, padding: 10 }}
+            style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button onClick={send} style={{ padding: "10px 14px" }}>
+          <button onClick={send} style={{ padding: "10px 14px", borderRadius: 10 }}>
             Send
           </button>
         </div>
