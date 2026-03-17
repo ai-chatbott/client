@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://server-vwfd.onrender.com";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function getBizId() {
   if (typeof window === "undefined") return "default";
@@ -13,165 +15,22 @@ function getBizId() {
 function getOrCreateId(key) {
   if (typeof window === "undefined") return "anon";
   let id = localStorage.getItem(key);
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id); }
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
   return id;
 }
-
-// ── component ─────────────────────────────────────────────────────────────────
-
-export default function DewWidget() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://server-vwfd.onrender.com";
-
-  const bizId      = useMemo(() => getBizId(), []);
-  const SESSION_KEY = useMemo(() => `dew_session_${bizId}`, [bizId]);
-  const NAME_KEY    = useMemo(() => `dew_name_${bizId}`, [bizId]);
-  const sessionId   = useMemo(() => getOrCreateId(SESSION_KEY), [SESSION_KEY]);
-
-  const [open, setOpen]       = useState(false);
-  const [biz, setBiz]         = useState(null);
-  const [name, setName]       = useState("");
-  const [input, setInput]     = useState("");
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi! What's your name?" },
-  ]);
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef(null);
-
-  const BOT_NAME = biz?.assistantName || "Dew";
-
-  // fetch business meta
-  useEffect(() => {
-    fetch(`${API_BASE}/business/${bizId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setBiz(d))
-      .catch(() => {});
-  }, [API_BASE, bizId]);
-
-  // load saved name + history
-  useEffect(() => {
-    const saved = localStorage.getItem(NAME_KEY);
-    if (saved) setName(saved);
-
-    fetch(`${API_BASE}/history?session_id=${encodeURIComponent(sessionId)}&biz_id=${encodeURIComponent(bizId)}`)
-      .then(r => r.json())
-      .then(d => { if (d?.messages?.length) setMessages(d.messages); })
-      .catch(() => {});
-  }, [API_BASE, sessionId, bizId, NAME_KEY]);
-
-  // scroll to bottom on new messages
-  useEffect(() => {
-    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open]);
-
-  async function send() {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
-
-    // name capture
-    if (!name) {
-      setName(text);
-      localStorage.setItem(NAME_KEY, text);
-      setMessages(prev => [
-        ...prev,
-        { role: "user", text },
-        { role: "assistant", text: `Nice to meet you, ${text}! I'm ${BOT_NAME}. How can I help you today?` },
-      ]);
-      return;
-    }
-
-    setMessages(prev => [...prev, { role: "user", text }]);
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text, name }),
-      });
-      const data = await res.json();
-      setMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", text: "Network error. Please try again." }]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <>
-      {/* Chat panel */}
-      {open && (
-        <div className={styles.panel}>
-          <div className={styles.header}>
-            <div className={styles.headerLeft}>
-              <img src="/dew.png" alt="Dew" className={styles.avatar} />
-              <div>
-                <div className={styles.botName}>{BOT_NAME}</div>
-                {biz?.businessName && (
-                  <div className={styles.bizName}>{biz.businessName}</div>
-                )}
-              </div>
-            </div>
-            <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close chat">
-              <CloseIcon />
-            </button>
-          </div>
-
-          <div className={styles.messages}>
-            {messages.map((m, i) => (
-              <div key={i} className={`${styles.bubble} ${m.role === "user" ? styles.user : styles.bot}`}>
-                <span dangerouslySetInnerHTML={{ __html: linkify(m.text, biz) }} />
-              </div>
-            ))}
-            {loading && (
-              <div className={`${styles.bubble} ${styles.bot}`}>
-                <span className={styles.typing}><span /><span /><span /></span>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          <div className={styles.inputRow}>
-            <input
-              className={styles.input}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-              placeholder={name ? "Ask something…" : "Your name…"}
-              disabled={loading}
-              autoFocus
-            />
-            <button className={styles.sendBtn} onClick={send} disabled={loading || !input.trim()} aria-label="Send">
-              <SendIcon />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Floating button */}
-      <button
-        className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
-        onClick={() => setOpen(o => !o)}
-        aria-label={open ? "Close chat" : "Open chat"}
-      >
-        {open ? <CloseIcon size={22} /> : <img src="/dew.png" alt="Dew" className={styles.fabImg} />}
-      </button>
-    </>
-  );
-}
-
-// ── link injection ────────────────────────────────────────────────────────────
 
 function linkify(text, biz) {
   if (!biz) return text;
   const { links = {}, phone = "" } = biz;
 
   const rules = [
-    [/book online/gi, links.booking, "book online"],
-    [/website gallery/gi, links.gallery, "website gallery"],
-    [/instagram/gi, links.instagram, "Instagram"],
-    [/our website/gi, links.website, "our website"],
+    [/book online/gi,     links.booking,   "book online"],
+    [/website gallery/gi, links.gallery,   "website gallery"],
+    [/instagram/gi,       links.instagram, "Instagram"],
+    [/our website/gi,     links.website,   "our website"],
   ];
 
   let out = text;
@@ -187,6 +46,175 @@ function linkify(text, biz) {
   }
 
   return out;
+}
+
+// ── component ─────────────────────────────────────────────────────────────────
+
+export default function DewWidget() {
+  const bizId     = useMemo(() => getBizId(), []);
+  const sessionId = useMemo(() => getOrCreateId(`dew_session_${bizId}`), [bizId]);
+
+  const [open,     setOpen]     = useState(false);
+  const [biz,      setBiz]      = useState(null);
+  const [name,     setName]     = useState("");
+  const [input,    setInput]    = useState("");
+  const [messages, setMessages] = useState([
+    { id: "init", role: "assistant", text: "Hi! What's your name?" },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  const BOT_NAME = biz?.assistantName || "Dew";
+
+  // fetch business meta
+  useEffect(() => {
+    fetch(`${API_BASE}/business/${bizId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setBiz(d))
+      .catch(() => {});
+  }, [bizId]);
+
+  // restore name + history
+  useEffect(() => {
+    const saved = localStorage.getItem(`dew_name_${bizId}`);
+    if (saved) setName(saved);
+
+    fetch(`${API_BASE}/history?session_id=${encodeURIComponent(sessionId)}&biz_id=${encodeURIComponent(bizId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.messages?.length) {
+          setMessages(d.messages.map((m, i) => ({ ...m, id: `hist-${i}` })));
+        }
+      })
+      .catch(() => {});
+  }, [bizId, sessionId]);
+
+  // scroll to bottom
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, open]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+
+    // name capture on first message
+    if (!name) {
+      const trimmed = text.slice(0, 50); // reasonable name length cap
+      setName(trimmed);
+      localStorage.setItem(`dew_name_${bizId}`, trimmed);
+      setMessages(prev => [
+        ...prev,
+        { id: `u-${Date.now()}`,   role: "user",      text: trimmed },
+        { id: `a-${Date.now()+1}`, role: "assistant", text: `Nice to meet you, ${trimmed}! I'm ${BOT_NAME}. How can I help you today?` },
+      ]);
+      return;
+    }
+
+    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: "user", text }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text, name }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: data.reply }]);
+    } catch (err) {
+      const isNetwork = err instanceof TypeError;
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: "assistant",
+          text: isNetwork
+            ? "Network error — please check your connection and try again."
+            : "Something went wrong. Please try again in a moment.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      {open && (
+        <div className={styles.panel} role="dialog" aria-label="Dew chat assistant">
+          <div className={styles.header}>
+            <div className={styles.headerLeft}>
+              <img src="/dew.png" alt="" className={styles.avatar} aria-hidden="true" />
+              <div>
+                <div className={styles.botName}>{BOT_NAME}</div>
+                {biz?.businessName && (
+                  <div className={styles.bizName}>{biz.businessName}</div>
+                )}
+              </div>
+            </div>
+            <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close chat">
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div className={styles.messages} aria-live="polite" aria-atomic="false">
+            {messages.map(m => (
+              <div key={m.id} className={`${styles.bubble} ${m.role === "user" ? styles.user : styles.bot}`}>
+                <span dangerouslySetInnerHTML={{ __html: linkify(m.text, biz) }} />
+              </div>
+            ))}
+            {loading && (
+              <div className={`${styles.bubble} ${styles.bot}`} aria-label="Dew is typing">
+                <span className={styles.typing}><span /><span /><span /></span>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className={styles.inputRow}>
+            <input
+              className={styles.input}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && send()}
+              placeholder={name ? "Ask something…" : "Your name…"}
+              disabled={loading}
+              autoFocus
+              aria-label="Chat input"
+              maxLength={500}
+            />
+            <button
+              className={styles.sendBtn}
+              onClick={send}
+              disabled={loading || !input.trim()}
+              aria-label="Send message"
+            >
+              <SendIcon />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <button
+        className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
+        onClick={() => setOpen(o => !o)}
+        aria-label={open ? "Close chat" : "Chat with Dew"}
+        aria-expanded={open}
+      >
+        {open
+          ? <CloseIcon size={22} />
+          : <img src="/dew.png" alt="Dew" className={styles.fabImg} />
+        }
+      </button>
+    </>
+  );
 }
 
 // ── icons ─────────────────────────────────────────────────────────────────────
