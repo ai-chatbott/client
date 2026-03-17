@@ -1,188 +1,210 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import styles from "./page.module.css";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 function getBizId() {
   if (typeof window === "undefined") return "default";
-  const p = new URLSearchParams(window.location.search);
-  return p.get("biz") || "default";
+  return new URLSearchParams(window.location.search).get("biz") || "default";
 }
 
-function getOrCreateId(storageKey) {
-  if (typeof window === "undefined") return "server";
-  let id = localStorage.getItem(storageKey);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(storageKey, id);
-  }
+function getOrCreateId(key) {
+  if (typeof window === "undefined") return "anon";
+  let id = localStorage.getItem(key);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id); }
   return id;
 }
 
-export default function Home() {
+// ── component ─────────────────────────────────────────────────────────────────
+
+export default function DewWidget() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://server-vwfd.onrender.com";
 
-  const bizId = useMemo(() => getBizId(), []);
+  const bizId      = useMemo(() => getBizId(), []);
+  const SESSION_KEY = useMemo(() => `dew_session_${bizId}`, [bizId]);
+  const NAME_KEY    = useMemo(() => `dew_name_${bizId}`, [bizId]);
+  const sessionId   = useMemo(() => getOrCreateId(SESSION_KEY), [SESSION_KEY]);
 
-  // ✅ per-biz storage keys so sessions don't mix between clients
-  const SESSION_KEY = useMemo(() => `bss_session_id_${bizId}`, [bizId]);
-  const NAME_KEY = useMemo(() => `bss_name_${bizId}`, [bizId]);
-
-  const sessionId = useMemo(() => getOrCreateId(SESSION_KEY), [SESSION_KEY]);
-
-  // ✅ you were calling setBiz without state; now it's real
-  const [biz, setBiz] = useState(null);
-
-  const [input, setInput] = useState("");
-  const [name, setName] = useState("");
+  const [open, setOpen]       = useState(false);
+  const [biz, setBiz]         = useState(null);
+  const [name, setName]       = useState("");
+  const [input, setInput]     = useState("");
   const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hello! What’s your name?" },
+    { role: "assistant", text: "Hi! What's your name?" },
   ]);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
 
-  // Load business config (name/assistant/links/phone)
+  const BOT_NAME = biz?.assistantName || "Dew";
+
+  // fetch business meta
   useEffect(() => {
     fetch(`${API_BASE}/business/${bizId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setBiz(data))
-      .catch(() => setBiz(null));
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setBiz(d))
+      .catch(() => {});
   }, [API_BASE, bizId]);
 
-  const BOT_NAME = biz?.assistantName || "Assistant";
-
-  // Load saved name + chat history
+  // load saved name + history
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(NAME_KEY);
+    if (saved) setName(saved);
 
-    const savedName = localStorage.getItem(NAME_KEY);
-    if (savedName) setName(savedName);
-
-    // ✅ history now includes biz_id (so backend can separate)
     fetch(`${API_BASE}/history?session_id=${encodeURIComponent(sessionId)}&biz_id=${encodeURIComponent(bizId)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.messages?.length) setMessages(data.messages);
-      })
+      .then(r => r.json())
+      .then(d => { if (d?.messages?.length) setMessages(d.messages); })
       .catch(() => {});
   }, [API_BASE, sessionId, bizId, NAME_KEY]);
 
-  function renderText(text) {
-    // ✅ keep your "keyword link" logic, but make URLs dynamic from biz config
-    const bookingUrl = biz?.links?.booking || "#";
-    const galleryUrl = biz?.links?.gallery || "#";
-    const instagramUrl = biz?.links?.instagram || "#";
-    const phone = biz?.phone || "";
-
-    return text
-      .replace(
-        /book online/gi,
-        bookingUrl === "#"
-          ? "book online"
-          : `<a href="${bookingUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">book online</a>`
-      )
-      .replace(
-        /call or text Shohre at (\d{3}[- ]?\d{3}[- ]?\d{4})/gi,
-        phone
-          ? `<a href="tel:${phone}" style="color:#4da3ff;text-decoration:underline;">call or text us at ${phone}</a>`
-          : `call or text us`
-      )
-      .replace(
-        /website gallery/gi,
-        galleryUrl === "#"
-          ? "website gallery"
-          : `<a href="${galleryUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">website gallery</a>`
-      )
-      .replace(
-        /Instagram/gi,
-        instagramUrl === "#"
-          ? "Instagram"
-          : `<a href="${instagramUrl}" target="_blank" rel="noreferrer" style="color:#4da3ff;text-decoration:underline;">Instagram</a>`
-      );
-  }
+  // scroll to bottom on new messages
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, open]);
 
   async function send() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || loading) return;
+    setInput("");
 
-    // Step 1: capture name once (keep your logic)
+    // name capture
     if (!name) {
       setName(text);
       localStorage.setItem(NAME_KEY, text);
-
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { role: "user", text },
-        { role: "assistant", text: `I'm ${BOT_NAME}. How can I help you today, ${text}?` },
+        { role: "assistant", text: `Nice to meet you, ${text}! I'm ${BOT_NAME}. How can I help you today?` },
       ]);
-      setInput("");
       return;
     }
 
-    // UI: user message
-    setMessages((prev) => [...prev, { role: "user", text }]);
-    setInput("");
+    setMessages(prev => [...prev, { role: "user", text }]);
+    setLoading(true);
 
     try {
       const res = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-
-        // ✅ you MUST send biz_id because backend expects it
         body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text, name }),
       });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", text: `Server error (${res.status}): ${errText}` },
-        ]);
-        return;
-      }
-
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+      setMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Network error. Please try again." },
-      ]);
+      setMessages(prev => [...prev, { role: "assistant", text: "Network error. Please try again." }]);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div id="ai-chat-widget">
-      <main style={{ maxWidth: 600, margin: "20px auto", fontFamily: "system-ui" }}>
-        {/* ✅ remove “Demo” */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontWeight: 700 }}>
-            {biz?.businessName ? `${biz.businessName} Assistant` : "Assistant"}
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
-            Ask about services, booking, pricing basics, and policies.
-          </div>
-        </div>
-
-        <div style={{ border: "1px solid #ddd", padding: 12, minHeight: 320, borderRadius: 12 }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ marginBottom: 12 }}>
-              <b>{m.role === "user" ? "You" : BOT_NAME}:</b>{" "}
-              <span dangerouslySetInnerHTML={{ __html: renderText(m.text) }} />
+    <>
+      {/* Chat panel */}
+      {open && (
+        <div className={styles.panel}>
+          <div className={styles.header}>
+            <div className={styles.headerLeft}>
+              <img src="/dew.png" alt="Dew" className={styles.avatar} />
+              <div>
+                <div className={styles.botName}>{BOT_NAME}</div>
+                {biz?.businessName && (
+                  <div className={styles.bizName}>{biz.businessName}</div>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
+            <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close chat">
+              <CloseIcon />
+            </button>
+          </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={name ? "Type your question…" : "Please enter your name"}
-            style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-          />
-          <button onClick={send} style={{ padding: "10px 14px", borderRadius: 10 }}>
-            Send
-          </button>
+          <div className={styles.messages}>
+            {messages.map((m, i) => (
+              <div key={i} className={`${styles.bubble} ${m.role === "user" ? styles.user : styles.bot}`}>
+                <span dangerouslySetInnerHTML={{ __html: linkify(m.text, biz) }} />
+              </div>
+            ))}
+            {loading && (
+              <div className={`${styles.bubble} ${styles.bot}`}>
+                <span className={styles.typing}><span /><span /><span /></span>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className={styles.inputRow}>
+            <input
+              className={styles.input}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && send()}
+              placeholder={name ? "Ask something…" : "Your name…"}
+              disabled={loading}
+              autoFocus
+            />
+            <button className={styles.sendBtn} onClick={send} disabled={loading || !input.trim()} aria-label="Send">
+              <SendIcon />
+            </button>
+          </div>
         </div>
-      </main>
-    </div>
+      )}
+
+      {/* Floating button */}
+      <button
+        className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
+        onClick={() => setOpen(o => !o)}
+        aria-label={open ? "Close chat" : "Open chat"}
+      >
+        {open ? <CloseIcon size={22} /> : <img src="/dew.png" alt="Dew" className={styles.fabImg} />}
+      </button>
+    </>
+  );
+}
+
+// ── link injection ────────────────────────────────────────────────────────────
+
+function linkify(text, biz) {
+  if (!biz) return text;
+  const { links = {}, phone = "" } = biz;
+
+  const rules = [
+    [/book online/gi, links.booking, "book online"],
+    [/website gallery/gi, links.gallery, "website gallery"],
+    [/instagram/gi, links.instagram, "Instagram"],
+    [/our website/gi, links.website, "our website"],
+  ];
+
+  let out = text;
+  for (const [re, url, label] of rules) {
+    if (url) out = out.replace(re, `<a href="${url}" target="_blank" rel="noreferrer" class="dew-link">${label}</a>`);
+  }
+
+  if (phone) {
+    out = out.replace(
+      /call or text.*?(\d[\d\s\-().]{6,}\d)/gi,
+      `<a href="tel:${phone}" class="dew-link">call or text us at ${phone}</a>`
+    );
+  }
+
+  return out;
+}
+
+// ── icons ─────────────────────────────────────────────────────────────────────
+
+function CloseIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
   );
 }
