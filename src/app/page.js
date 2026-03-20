@@ -159,7 +159,7 @@ export default function DewWidget() {
           role="dialog"
           aria-label="Dew chat assistant"
         >
-          <div className={styles.header}>
+          <div className={styles.header} style={embedded ? { display: "none" } : {}}>
             <div className={styles.headerLeft}>
               <img src="/dew.png" alt="" className={styles.avatar} aria-hidden="true" />
               <div>
