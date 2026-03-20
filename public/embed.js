@@ -17,7 +17,7 @@
 
   Object.assign(iframe.style, {
     position:   "fixed",
-    bottom:     "80px",
+    bottom:     "0",
     right:      "0",
     width:      "420px",
     height:     "640px",
