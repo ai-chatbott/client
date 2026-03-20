@@ -5,11 +5,13 @@
 (function () {
   if (document.getElementById("dew-widget-iframe")) return;
 
-  var src  = document.currentScript
-    ? document.currentScript.src
-    : (document.querySelector('script[src*="embed.js"]') || {}).src || "";
-  var biz  = new URLSearchParams(src.split("?")[1] || "").get("biz") || "default";
-  var base = new URL(src).origin;
+  var scriptEl = document.currentScript
+    || document.querySelector('script[src*="embed.js"]');
+  var src  = (scriptEl || {}).src || "";
+  var biz  = (scriptEl && scriptEl.getAttribute("data-biz"))
+    || new URLSearchParams(src.split("?")[1] || "").get("biz")
+    || "default";
+  var base = src ? new URL(src).origin : window.location.origin;
 
   // ── iframe (panel) ──────────────────────────────────────────────────────
   var iframe = document.createElement("iframe");
