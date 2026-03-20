@@ -5,7 +5,9 @@
 (function () {
   if (document.getElementById("dew-widget-iframe")) return;
 
-  var src  = document.currentScript.src;
+  var src  = document.currentScript
+    ? document.currentScript.src
+    : (document.querySelector('script[src*="embed.js"]') || {}).src || "";
   var biz  = new URLSearchParams(src.split("?")[1] || "").get("biz") || "default";
   var base = new URL(src).origin;
 
