@@ -50,11 +50,17 @@ function linkify(text, biz) {
 
 // ── component ─────────────────────────────────────────────────────────────────
 
+function isEmbedded() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("embed") === "1";
+}
+
 export default function DewWidget() {
   const bizId     = useMemo(() => getBizId(), []);
   const sessionId = useMemo(() => getOrCreateId(`dew_session_${bizId}`), [bizId]);
+  const embedded  = useMemo(() => isEmbedded(), []);
 
-  const [open,     setOpen]     = useState(false);
+  const [open, setOpen] = useState(false);
   const [biz,      setBiz]      = useState(null);
   const [name,     setName]     = useState("");
   const [input,    setInput]    = useState("");
@@ -147,8 +153,12 @@ export default function DewWidget() {
 
   return (
     <>
-      {open && (
-        <div className={styles.panel} role="dialog" aria-label="Dew chat assistant">
+      {(open || embedded) && (
+        <div
+          className={embedded ? styles.panelEmbedded : styles.panel}
+          role="dialog"
+          aria-label="Dew chat assistant"
+        >
           <div className={styles.header}>
             <div className={styles.headerLeft}>
               <img src="/dew.png" alt="" className={styles.avatar} aria-hidden="true" />
@@ -202,17 +212,19 @@ export default function DewWidget() {
         </div>
       )}
 
-      <button
-        className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
-        onClick={() => setOpen(o => !o)}
-        aria-label={open ? "Close chat" : "Chat with Dew"}
-        aria-expanded={open}
-      >
-        {open
-          ? <CloseIcon size={22} />
-          : <img src="/dew.png" alt="Dew" className={styles.fabImg} />
-        }
-      </button>
+      {!embedded && (
+        <button
+          className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
+          onClick={() => setOpen(o => !o)}
+          aria-label={open ? "Close chat" : "Chat with Dew"}
+          aria-expanded={open}
+        >
+          {open
+            ? <CloseIcon size={22} />
+            : <img src="/dew.png" alt="Dew" className={styles.fabImg} />
+          }
+        </button>
+      )}
     </>
   );
 }
