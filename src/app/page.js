@@ -159,7 +159,7 @@ export default function DewWidget() {
           role="dialog"
           aria-label="Dew chat assistant"
         >
-          <div className={styles.header} style={embedded ? { display: "none" } : {}}>
+          <div className={styles.header}>
             <div className={styles.headerLeft}>
               <img src="/dew.png" alt="" className={styles.avatar} aria-hidden="true" />
               <div>
@@ -169,7 +169,11 @@ export default function DewWidget() {
                 )}
               </div>
             </div>
-            <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close chat">
+            <button
+              className={styles.closeBtn}
+              onClick={() => embedded ? window.parent.postMessage("dew:close", "*") : setOpen(false)}
+              aria-label="Close chat"
+            >
               <CloseIcon />
             </button>
           </div>
