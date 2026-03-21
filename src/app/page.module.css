@@ -2,14 +2,16 @@
 :root {
   --dew-blue:       #5b9bd5;
   --dew-blue-dark:  #4a87c0;
-  --dew-blue-light: #f0f7ff;
+  --dew-blue-light: rgba(240, 247, 255, 0.6);
   --dew-blue-mid:   #b8d8f0;
   --dew-text:       #1e293b;
   --dew-muted:      #64748b;
-  --dew-border:     #e2e8f0;
+  --dew-border:     rgba(255,255,255,0.15);
   --dew-white:      #ffffff;
   --dew-radius:     16px;
   --dew-shadow:     0 8px 32px rgba(91, 155, 213, 0.22), 0 2px 8px rgba(0,0,0,0.08);
+  --dew-glass-bg:   rgba(255,255,255,0.75);
+  --dew-glass-blur: blur(20px);
 }
 
 .panelEmbedded {
@@ -17,7 +19,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  background: var(--dew-white);
+  background: var(--dew-glass-bg);
+  backdrop-filter: var(--dew-glass-blur);
+  -webkit-backdrop-filter: var(--dew-glass-blur);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -68,7 +72,10 @@
   right: 24px;
   width: 360px;
   max-height: 540px;
-  background: var(--dew-white);
+  background: var(--dew-glass-bg);
+  backdrop-filter: var(--dew-glass-blur);
+  -webkit-backdrop-filter: var(--dew-glass-blur);
+  border: 1px solid rgba(255,255,255,0.3);
   border-radius: var(--dew-radius);
   box-shadow: var(--dew-shadow);
   display: flex;
@@ -160,7 +167,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--dew-blue-light);
+  background: rgba(240, 247, 255, 0.5);
 }
 
 .messages::-webkit-scrollbar { width: 4px; }
@@ -176,7 +183,8 @@
 }
 
 .bot {
-  background: var(--dew-white);
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(8px);
   color: var(--dew-text);
   border-bottom-left-radius: 4px;
   align-self: flex-start;
@@ -260,8 +268,9 @@
   flex-direction: column;
   gap: 0;
   padding: 8px 12px 12px;
-  border-top: 1px solid var(--dew-border);
-  background: var(--dew-white);
+  border-top: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
   flex-shrink: 0;
 }
 

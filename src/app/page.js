@@ -142,6 +142,14 @@ export default function DewWidget() {
   const sessionId = useMemo(() => getOrCreateId(`dew_session_${bizId}`), [bizId]);
   const embedded  = useMemo(() => isEmbedded(), []);
 
+  // lock body scroll in embed mode so only messages scroll
+  useEffect(() => {
+    if (embedded) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
+  }, [embedded]);
+
   const [open, setOpen] = useState(false);
   const [biz,      setBiz]      = useState(null);
   const [input,    setInput]    = useState("");
