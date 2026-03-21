@@ -173,6 +173,16 @@ export default function DewWidget() {
                 <span dangerouslySetInnerHTML={{ __html: linkify(m.text, biz) }} />
               </div>
             ))}
+            {/* quick replies — show after greeting, hide once user sends a message */}
+            {biz?.quickReplies?.length > 0 && messages.length <= 1 && !loading && (
+              <div className={styles.quickReplies}>
+                {biz.quickReplies.map((q, i) => (
+                  <button key={i} className={styles.quickReply} onClick={() => send(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
             {loading && (
               <div className={`${styles.bubble} ${styles.bot}`} aria-label="Dew is typing">
                 <span className={styles.typing}><span /><span /><span /></span>
@@ -182,15 +192,6 @@ export default function DewWidget() {
           </div>
 
           <div className={styles.inputRow}>
-            {biz?.quickReplies?.length > 0 && messages.length <= 1 && (
-              <div className={styles.quickReplies}>
-                {biz.quickReplies.map((q, i) => (
-                  <button key={i} className={styles.quickReply} onClick={() => send(q)} disabled={loading}>
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
             <div className={styles.inputInner}>
                 <input
                 className={styles.input}

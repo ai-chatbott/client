@@ -154,6 +154,7 @@
 /* ── messages ───────────────────────────────────────────────────────────── */
 .messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
@@ -225,11 +226,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 12px 0;
+  align-self: flex-start;
+  max-width: 90%;
 }
 
 .quickReply {
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: 20px;
   border: 1.5px solid var(--dew-blue);
   background: var(--dew-white);
@@ -238,16 +240,12 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-.quickReply:hover:not(:disabled) {
+.quickReply:hover {
   background: var(--dew-blue);
   color: var(--dew-white);
-}
-
-.quickReply:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .inputInner {
