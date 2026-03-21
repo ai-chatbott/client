@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import landing from "./landing.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://server-vwfd.onrender.com";
 
@@ -52,6 +53,81 @@ function linkify(text, biz) {
   );
 
   return out;
+}
+
+// ── landing page (shown at root when not embedded) ────────────────────────
+
+function LandingPage({ onOpen }) {
+  return (
+    <div className={landing.page}>
+      <div className={landing.hero}>
+        <img src="/dew.png" alt="Dew" className={landing.logo} />
+        <h1 className={landing.title}>Meet <span>Dew</span></h1>
+        <p className={landing.subtitle}>
+          An embeddable AI front-desk assistant for small businesses and portfolios.
+          Drop one script tag on any website and your visitors get instant answers.
+        </p>
+        <button className={landing.tryBtn} onClick={onOpen}>
+          Try it now →
+        </button>
+      </div>
+
+      <div className={landing.sections}>
+        <div className={landing.section}>
+          <div className={landing.sectionLabel}>Why I built this</div>
+          <h2 className={landing.sectionTitle}>Every project deserves a voice</h2>
+          <p className={landing.sectionText}>
+            Most websites make visitors hunt for basic information — hours, services, how to book.
+            I wanted a way to give any project or business an instant, always-on assistant that
+            answers questions in plain language, without requiring a support team or a complex setup.
+            Dew is that assistant. One script tag, and your site can hold a real conversation.
+          </p>
+        </div>
+
+        <div className={landing.section}>
+          <div className={landing.sectionLabel}>How it works</div>
+          <h2 className={landing.sectionTitle}>Knowledge files, not fine-tuning</h2>
+          <p className={landing.sectionText}>
+            Each business gets a plain-text knowledge file describing their services, hours, and FAQs.
+            That file becomes the system prompt context for every conversation. No model training,
+            no database of embeddings — just a well-structured prompt and Google Gemini doing the rest.
+            New business? Add two files and embed the script. Done in minutes.
+          </p>
+        </div>
+
+        <div className={landing.section}>
+          <div className={landing.sectionLabel}>Tech stack</div>
+          <h2 className={landing.sectionTitle}>Built to be lightweight and portable</h2>
+          <p className={landing.sectionText}>
+            The backend is a FastAPI server with SQLite for conversation history.
+            The frontend is a Next.js app served as an iframe — so it works on any site
+            without style conflicts. The embed script is a single vanilla JS file with no dependencies.
+          </p>
+          <div className={landing.stack}>
+            {["Next.js 16", "React 19", "FastAPI", "SQLite", "Google Gemini", "Vercel", "Render"].map(t => (
+              <span key={t} className={landing.pill}>{t}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className={landing.section}>
+          <div className={landing.sectionLabel}>Embed anywhere</div>
+          <h2 className={landing.sectionTitle}>One line of code</h2>
+          <p className={landing.sectionText}>
+            Add Dew to any website — Next.js, plain HTML, Webflow, Squarespace — with a single script tag.
+            The <code>biz</code> parameter tells the widget which business context to load.
+          </p>
+          <div className={landing.stack}>
+            <span className={landing.pill}>{"<script src=\".../embed.js?biz=your-biz\"></script>"}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={landing.footer}>
+        Built by <a href="https://www.beiraghian.com" target="_blank" rel="noreferrer">Shabnam Beiraghian</a>
+      </div>
+    </div>
+  );
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -142,6 +218,7 @@ export default function DewWidget() {
 
   return (
     <>
+      {!embedded && !open && <LandingPage onOpen={() => setOpen(true)} />}
       {(open || embedded) && (
         <div
           className={embedded ? styles.panelEmbedded : styles.panel}
