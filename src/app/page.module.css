@@ -220,11 +220,48 @@
   40%           { transform: translateY(-6px); }
 }
 
+/* ── quick replies ──────────────────────────────────────────────────────── */
+.quickReplies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.quickReply {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--dew-blue);
+  background: var(--dew-white);
+  color: var(--dew-blue);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.quickReply:hover:not(:disabled) {
+  background: var(--dew-blue);
+  color: var(--dew-white);
+}
+
+.quickReply:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.inputInner {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
 /* ── input row ──────────────────────────────────────────────────────────── */
 .inputRow {
   display: flex;
-  gap: 8px;
-  padding: 12px;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 12px 12px;
   border-top: 1px solid var(--dew-border);
   background: var(--dew-white);
   flex-shrink: 0;

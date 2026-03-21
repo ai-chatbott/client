@@ -62,10 +62,9 @@ export default function DewWidget() {
 
   const [open, setOpen] = useState(false);
   const [biz,      setBiz]      = useState(null);
-  const [name,     setName]     = useState("");
   const [input,    setInput]    = useState("");
   const [messages, setMessages] = useState([
-    { id: "init", role: "assistant", text: "Hi! What's your name?" },
+    { id: "init", role: "assistant", text: "Hi! How can I help you today?" },
   ]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
@@ -80,11 +79,8 @@ export default function DewWidget() {
       .catch(() => {});
   }, [bizId]);
 
-  // restore name + history
+  // restore history
   useEffect(() => {
-    const saved = localStorage.getItem(`dew_name_${bizId}`);
-    if (saved) setName(saved);
-
     fetch(`${API_BASE}/history?session_id=${encodeURIComponent(sessionId)}&biz_id=${encodeURIComponent(bizId)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -100,23 +96,10 @@ export default function DewWidget() {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
 
-  async function send() {
-    const text = input.trim();
+  async function send(overrideText) {
+    const text = (overrideText || input).trim();
     if (!text || loading) return;
     setInput("");
-
-    // name capture on first message
-    if (!name) {
-      const trimmed = text.slice(0, 50); // reasonable name length cap
-      setName(trimmed);
-      localStorage.setItem(`dew_name_${bizId}`, trimmed);
-      setMessages(prev => [
-        ...prev,
-        { id: `u-${Date.now()}`,   role: "user",      text: trimmed },
-        { id: `a-${Date.now()+1}`, role: "assistant", text: `Nice to meet you, ${trimmed}! I'm ${BOT_NAME}. How can I help you today?` },
-      ]);
-      return;
-    }
 
     setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: "user", text }]);
     setLoading(true);
@@ -125,7 +108,7 @@ export default function DewWidget() {
       const res = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text, name }),
+        body: JSON.stringify({ session_id: sessionId, biz_id: bizId, text }),
       });
 
       if (!res.ok) {
@@ -193,25 +176,36 @@ export default function DewWidget() {
           </div>
 
           <div className={styles.inputRow}>
-            <input
-              className={styles.input}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-              placeholder={name ? "Ask something…" : "Your name…"}
-              disabled={loading}
-              autoFocus
-              aria-label="Chat input"
-              maxLength={500}
-            />
-            <button
-              className={styles.sendBtn}
-              onClick={send}
-              disabled={loading || !input.trim()}
-              aria-label="Send message"
-            >
-              <SendIcon />
-            </button>
+            {biz?.quickReplies?.length > 0 && messages.length <= 1 && (
+              <div className={styles.quickReplies}>
+                {biz.quickReplies.map((q, i) => (
+                  <button key={i} className={styles.quickReply} onClick={() => send(q)} disabled={loading}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className={styles.inputInner}>
+                <input
+                className={styles.input}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && send()}
+                placeholder="Ask something…"
+                disabled={loading}
+                autoFocus
+                aria-label="Chat input"
+                maxLength={500}
+              />
+              <button
+                className={styles.sendBtn}
+                onClick={() => send()}
+                disabled={loading || !input.trim()}
+                aria-label="Send message"
+              >
+                <SendIcon />
+              </button>
+            </div>
           </div>
         </div>
       )}
