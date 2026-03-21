@@ -45,6 +45,12 @@ function linkify(text, biz) {
     );
   }
 
+  // auto-linkify bare URLs not already inside an <a>
+  out = out.replace(
+    /(?<!href=")(https?:\/\/[^\s<>"]+)/g,
+    `<a href="$1" target="_blank" rel="noreferrer" class="dew-link">$1</a>`
+  );
+
   return out;
 }
 
